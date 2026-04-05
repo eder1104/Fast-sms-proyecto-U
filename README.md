@@ -1,6 +1,6 @@
-# Multi SMS — Laravel 11 + Redis + Patrón Strategy
+# Multi SMS — Laravel 11 + Redis +
 
-Sistema de envío distribuido de SMS que soporta múltiples proveedores mediante el patrón Strategy y procesamiento asíncrono con Redis.
+Sistema de envío distribuido de SMS que soporta múltiples proveedores mediante el procesamiento asíncrono con Redis.
 
 ## Requisitos
 
@@ -43,7 +43,7 @@ VONAGE_SMS_FROM=MultiSMS
 
 ---
 
-## Arquitectura — Patrón Strategy
+## Arquitectura
 
 ```
 SmsProviderInterface
@@ -63,9 +63,9 @@ SMS_PROVIDER=log      # activa LogSmsProvider (por defecto)
 
 ---
 
-## Levantar 3 workers en paralelo (arquitectura distribuida)
+## Levantar 3 workers en paralelo
 
-Abre **4 terminales** y ejecuta lo siguiente:
+Abrir **4 terminales** y ejecuta lo siguiente:
 
 ```bash
 # Terminal 1 — Servidor HTTP
@@ -73,15 +73,6 @@ php artisan serve
 
 # Terminal 2 — Worker #1
 php artisan queue:work redis --sleep=3 --tries=3
-
-# Terminal 3 — Worker #2
-php artisan queue:work redis --sleep=3 --tries=3
-
-# Terminal 4 — Worker #3
-php artisan queue:work redis --sleep=3 --tries=3
-```
-
-Cada worker es un proceso independiente con su propio PID. Los logs confirman cuál procesó cada Job.
 
 ---
 
@@ -117,78 +108,20 @@ Content-Type: application/json
 
 ## Pruebas
 
-### PowerShell (Windows)
+### PowerShell
 
 ```powershell
-$body = @{ phone = "+573001234567"; message = "Hola desde Multi SMS" } | ConvertTo-Json
+$body = @{ phone = "+573164795110"; message = "Hola desde Multi SMS" } | ConvertTo-Json
 Invoke-RestMethod -Method POST -Uri "http://localhost:8000/api/send-sms" -ContentType "application/json" -Body $body
 ```
 
-### curl (Linux / Mac / Git Bash)
-
-```bash
-curl -X POST http://localhost:8000/api/send-sms \
-  -H "Content-Type: application/json" \
-  -d '{"phone":"+573001234567","message":"Hola desde Multi SMS"}'
-```
-
-### Carga masiva — 10 mensajes simultáneos (PowerShell)
+### Carga masiva — 10 mensajes simultáneos
 
 ```powershell
-1..10 | ForEach-Object -Parallel {
-    $body = @{ phone = "+57300000000$_"; message = "Mensaje $_" } | ConvertTo-Json
-    Invoke-RestMethod -Method POST -Uri "http://localhost:8000/api/send-sms" -ContentType "application/json" -Body $body
-} -ThrottleLimit 10
-```
-
----
-
-## Ver logs en tiempo real
-
-```bash
-# PowerShell
-Get-Content storage/logs/laravel.log -Wait -Tail 20
-
-# Linux/Mac
-tail -f storage/logs/laravel.log
-```
-
-### Ejemplo de salida con 3 workers
-
-```
-local.INFO: Worker procesando SMS {"worker_pid":14201,"provider":"App\Services\Sms\LogSmsProvider","phone":"+573001"}
-local.INFO: [LogSmsProvider] SMS simulado {"phone":"+573001","message":"Mensaje 1"}
-local.INFO: Worker procesando SMS {"worker_pid":14203,"provider":"App\Services\Sms\LogSmsProvider","phone":"+573002"}
-local.INFO: Worker procesando SMS {"worker_pid":14202,"provider":"App\Services\Sms\LogSmsProvider","phone":"+573003"}
-```
-
-Los **PIDs distintos** (14201, 14202, 14203) demuestran que los 3 workers procesaron Jobs en paralelo.
-
----
-
-## Estructura del proyecto
-
-```
-app/
-├── Contracts/
-│   └── SmsProviderInterface.php          ← Interfaz Strategy
-├── Services/Sms/
-│   ├── LogSmsProvider.php                ← Implementación: log
-│   └── VonageSmsProvider.php             ← Implementación: Vonage
-├── Jobs/
-│   └── SendSmsJob.php                    ← Job con DI del proveedor
-├── Http/Controllers/
-│   └── SmsController.php                 ← Endpoint POST /api/send-sms
-└── Providers/
-    └── SmsServiceProvider.php            ← Resolución del proveedor
-
-routes/
-└── api.php                               ← Ruta POST /api/send-sms
-
-config/
-└── services.php                          ← Configuración Vonage + SMS_PROVIDER
-
-bootstrap/
-├── app.php                               ← Registro de rutas API
-└── providers.php                         ← Registro de SmsServiceProvider
+$url = "http://localhost:8000/api/send-sms"
+foreach ($i in 1..5) {
+    $body = @{ phone = "+573164795110"; message = "Mensaje numero $i" } | ConvertTo-Json
+    Invoke-RestMethod -Uri $url -Method Post -Body $body -ContentType "application/json"
+    Start-Sleep -Milliseconds 200
+}
 ```
